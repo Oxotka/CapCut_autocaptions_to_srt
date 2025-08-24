@@ -176,7 +176,16 @@ def main():
     capcut_dir = "/Users/nikitaaripov/Movies/CapCut/User Data/Projects/com.lveditor.draft/"
     project_name = "0824"
     input_file = f"{capcut_dir}{project_name}/draft_info.json"
-    output_file = "captions.srt"
+    
+    # Создаем папку result если её нет
+    import os
+    result_dir = "result"
+    os.makedirs(result_dir, exist_ok=True)
+    
+    # Формируем имя выходного файла с временной меткой
+    from datetime import datetime
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    output_file = os.path.join(result_dir, f"captions_{timestamp}.srt")
     
     print(f"Конвертируем {input_file} в {output_file}...")
     
@@ -185,6 +194,7 @@ def main():
     if subtitle_count > 0:
         print("Конвертация завершена успешно!")
         print(f"Результат сохранен в файл {output_file}")
+        print(f"Файл находится в папке: {os.path.abspath(result_dir)}")
         
         # Создаем промпт для нейросети и копируем в буфер обмена
         ai_prompt = create_ai_prompt(srt_content)
