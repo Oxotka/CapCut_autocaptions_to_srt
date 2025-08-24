@@ -5,6 +5,29 @@
 """
 
 import json
+import pyperclip
+
+
+def create_ai_prompt(srt_content: str) -> str:
+    """
+    Создает промпт для нейросети на основе содержимого SRT файла
+    
+    Args:
+        srt_content: содержимое SRT файла
+        
+    Returns:
+        готовый промпт для нейросети
+    """
+    base_prompt = """Нужно перевести субтитры на английский язык 
+1 Сохранять точное количество строк и оригинальные временные метки 
+2 Использовать инструктивный, разговорный стиль с естественными английскими конструкциями 
+3 Строго придерживаться терминологии
+
+В итоге должен получиться текст в таком же формате как и был
+
+"""
+    
+    return base_prompt + srt_content
 
 
 def parse_time_microseconds(time_microseconds: int) -> str:
@@ -60,7 +83,7 @@ def extract_subtitle_text(subtitle_cache_info: str) -> str:
         return ""
 
 
-def convert_draft_info_to_srt(input_file: str, output_file: str) -> int:
+def convert_draft_info_to_srt(input_file: str, output_file: str) -> tuple[int, str]:
     """
     Конвертирует файл draft_info.json в формат SRT
     
@@ -69,7 +92,7 @@ def convert_draft_info_to_srt(input_file: str, output_file: str) -> int:
         output_file: путь к выходному файлу captions-2.srt
         
     Returns:
-        количество найденных субтитров
+        кортеж (количество найденных субтитров, содержимое SRT файла)
     """
     try:
         # Читаем JSON файл
@@ -99,7 +122,7 @@ def convert_draft_info_to_srt(input_file: str, output_file: str) -> int:
         
         if not subtitle_fragments:
             print("Ошибка: поле subtitle_fragment_info_list не найдено")
-            return 0
+            return 0, ""
         
         # Фильтруем фрагменты с субтитрами
         subtitles_with_text = []
@@ -116,31 +139,35 @@ def convert_draft_info_to_srt(input_file: str, output_file: str) -> int:
         # Сортируем по времени начала
         subtitles_with_text.sort(key=lambda x: x["start_time"])
         
+        # Формируем содержимое SRT файла
+        srt_content = ""
+        for i, subtitle in enumerate(subtitles_with_text, 1):
+            start_time = parse_time_microseconds(subtitle["start_time"])
+            end_time = parse_time_microseconds(subtitle["end_time"])
+            text = subtitle["text"]
+            
+            srt_content += f"{i}\n"
+            srt_content += f"{start_time} --> {end_time}\n"
+            srt_content += f"{text}\n\n"
+        
         # Записываем в SRT файл
         with open(output_file, 'w', encoding='utf-8') as f:
-            for i, subtitle in enumerate(subtitles_with_text, 1):
-                start_time = parse_time_microseconds(subtitle["start_time"])
-                end_time = parse_time_microseconds(subtitle["end_time"])
-                text = subtitle["text"]
-                
-                f.write(f"{i}\n")
-                f.write(f"{start_time} --> {end_time}\n")
-                f.write(f"{text}\n\n")
+            f.write(srt_content)
         
         print(f"Успешно создан файл {output_file}")
         print(f"Найдено {len(subtitles_with_text)} субтитров")
         
-        return len(subtitles_with_text)
+        return len(subtitles_with_text), srt_content
         
     except FileNotFoundError:
         print(f"Ошибка: файл {input_file} не найден")
-        return 0
+        return 0, ""
     except json.JSONDecodeError as e:
         print(f"Ошибка парсинга JSON: {e}")
-        return 0
+        return 0, ""
     except Exception as e:
         print(f"Произошла ошибка: {e}")
-        return 0
+        return 0, ""
 
 
 def main():
@@ -153,11 +180,24 @@ def main():
     
     print(f"Конвертируем {input_file} в {output_file}...")
     
-    subtitle_count = convert_draft_info_to_srt(input_file, output_file)
+    subtitle_count, srt_content = convert_draft_info_to_srt(input_file, output_file)
     
     if subtitle_count > 0:
         print("Конвертация завершена успешно!")
         print(f"Результат сохранен в файл {output_file}")
+        
+        # Создаем промпт для нейросети и копируем в буфер обмена
+        ai_prompt = create_ai_prompt(srt_content)
+        try:
+            pyperclip.copy(ai_prompt)
+            print("Промпт для нейросети скопирован в буфер обмена!")
+            print("Теперь вы можете вставить его в любой AI-сервис для перевода субтитров.")
+        except Exception as e:
+            print(f"Ошибка при копировании в буфер обмена: {e}")
+            print("Промпт для нейросети:")
+            print("-" * 50)
+            print(ai_prompt)
+            print("-" * 50)
     else:
         print("Конвертация не удалась.")
 
